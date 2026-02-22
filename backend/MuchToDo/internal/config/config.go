@@ -23,61 +23,56 @@ type Config struct {
 	AllowedOrigins     []string `mapstructure:"ALLOWED_ORIGINS"`
 }
 
-// LoadConfig reads configuration from file or environment variables.
+// LoadConfig reads configuration from environment variables (Docker-safe).
 func LoadConfig(path string) (config Config, err error) {
-	viper.AddConfigPath(path)
-	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
 
+	// Automatically read environment variables
 	viper.AutomaticEnv()
 
-	// Set default values
+	// Explicitly bind all environment variables (IMPORTANT FOR DOCKER)
+	viper.BindEnv("PORT")
+	viper.BindEnv("MONGO_URI")
+	viper.BindEnv("DB_NAME")
+	viper.BindEnv("JWT_SECRET_KEY")
+	viper.BindEnv("JWT_EXPIRATION_HOURS")
+	viper.BindEnv("ENABLE_CACHE")
+	viper.BindEnv("REDIS_ADDR")
+	viper.BindEnv("REDIS_PASSWORD")
+	viper.BindEnv("LOG_LEVEL")
+	viper.BindEnv("LOG_FORMAT")
+	viper.BindEnv("COOKIE_DOMAINS")
+	viper.BindEnv("SECURE_COOKIE")
+	viper.BindEnv("ALLOWED_ORIGINS")
+
+	// Defaults
 	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("ENABLE_CACHE", false)
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 72)
-	viper.SetDefault("COOKIE_DOMAINS", []string{"localhost"})
+	viper.SetDefault("COOKIE_DOMAINS", "localhost")
 	viper.SetDefault("SECURE_COOKIE", false)
-	viper.SetDefault("ALLOWED_ORIGINS", []string{"http://localhost:5173"})
-
-	err = viper.ReadInConfig()
-	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return
-		}
-	}
+	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:5173")
 
 	err = viper.Unmarshal(&config)
 	if err != nil {
 		return
 	}
 
-	// Manually handle comma-separated strings for slices if viper didn't split them
+	// Manually split comma-separated lists
 	if allowedOrigins := viper.GetString("ALLOWED_ORIGINS"); allowedOrigins != "" {
 		parts := strings.Split(allowedOrigins, ",")
-		var cleaned []string
-		for _, p := range parts {
-			// Trim spaces and quotes
-			trimmed := strings.TrimSpace(p)
-			trimmed = strings.Trim(trimmed, "\"'")
-			if trimmed != "" {
-				cleaned = append(cleaned, trimmed)
-			}
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
 		}
-		config.AllowedOrigins = cleaned
+		config.AllowedOrigins = parts
 	}
 
 	if cookieDomains := viper.GetString("COOKIE_DOMAINS"); cookieDomains != "" {
 		parts := strings.Split(cookieDomains, ",")
-		var cleaned []string
-		for _, p := range parts {
-			// Trim spaces and quotes
-			trimmed := strings.TrimSpace(p)
-			trimmed = strings.Trim(trimmed, "\"'")
-			if trimmed != "" {
-				cleaned = append(cleaned, trimmed)
-			}
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
 		}
-		config.CookieDomains = cleaned
+		config.CookieDomains = parts
 	}
 
 	return
